@@ -746,7 +746,10 @@ class HomeActivity : ScreenLockActionBarActivity(),
 
     private fun markAllAsRead(thread: ThreadRecord) {
         lifecycleScope.launch(Dispatchers.Default) {
-            storage.markConversationAsRead(thread.threadId, clock.currentTimeMills())
+            storage.updateConversationLastSeenIfNeeded(
+                thread.recipient.address as Address.Conversable,
+                clock.currentTimeMills()
+            )
         }
     }
 
