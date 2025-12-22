@@ -97,8 +97,7 @@ import org.session.libsession.messaging.sending_receiving.attachments.Attachment
 import org.session.libsession.messaging.sending_receiving.link_preview.LinkPreview
 import org.session.libsession.messaging.sending_receiving.notifications.MessageNotifier
 import org.session.libsession.messaging.sending_receiving.quotes.QuoteModel
-import org.session.libsession.snode.SnodeAPI
-import org.session.libsession.snode.SnodeClock
+import org.session.libsession.network.SnodeClock
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.Address.Companion.fromSerialized
 import org.session.libsession.utilities.MediaTypes
@@ -266,6 +265,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
     @Inject lateinit var resendMessageUtilities: ResendMessageUtilities
     @Inject lateinit var messageNotifier: MessageNotifier
     @Inject lateinit var proStatusManager: ProStatusManager
+    @Inject lateinit var snodeClock: SnodeClock
     @Inject @ManagerScope
     lateinit var scope: CoroutineScope
 
@@ -1791,7 +1791,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
         // Create the message
         val recipient = viewModel.recipient
         val reactionMessage = VisibleMessage()
-        val emojiTimestamp = SnodeAPI.nowWithOffset
+        val emojiTimestamp = snodeClock.currentTimeMills()
         reactionMessage.sentTimestamp = emojiTimestamp
         val author = loginStateRepository.getLocalNumber()
 
@@ -1859,7 +1859,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
     private fun sendEmojiRemoval(emoji: String, originalMessage: MessageRecord) {
         val recipient = viewModel.recipient
         val message = VisibleMessage()
-        val emojiTimestamp = SnodeAPI.nowWithOffset
+        val emojiTimestamp = snodeClock.currentTimeMills()
         message.sentTimestamp = emojiTimestamp
         val author = loginStateRepository.getLocalNumber()
 
@@ -2154,7 +2154,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
 
     private fun sendTextOnlyMessage(hasPermissionToSendSeed: Boolean = false): Pair<Address, Long>? {
         val recipient = viewModel.recipient
-        val sentTimestamp = SnodeAPI.nowWithOffset
+        val sentTimestamp = snodeClock.currentTimeMills()
         viewModel.implicitlyApproveRecipient()?.let { conversationApprovalJob = it }
         val text = getMessageBody()
         val isNoteToSelf = recipient.isLocalNumber
@@ -2213,7 +2213,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
         deleteAttachmentFilesAfterSave: Boolean = false,
     ): Pair<Address, Long>? {
         val recipient = viewModel.recipient
-        val sentTimestamp = SnodeAPI.nowWithOffset
+        val sentTimestamp = snodeClock.currentTimeMills()
         viewModel.implicitlyApproveRecipient()?.let { conversationApprovalJob = it }
 
         // Create the message
@@ -2799,7 +2799,7 @@ class ConversationActivityV2 : ScreenLockActionBarActivity(), InputBarDelegate,
     private fun sendMediaSavedNotification() {
         val recipient = viewModel.recipient
         if (recipient.isGroupOrCommunityRecipient) { return }
-        val timestamp = SnodeAPI.nowWithOffset
+        val timestamp = snodeClock.currentTimeMills()
         val kind = DataExtractionNotification.Kind.MediaSaved(timestamp)
         val message = DataExtractionNotification(kind)
         messageSender.send(message, recipient.address)

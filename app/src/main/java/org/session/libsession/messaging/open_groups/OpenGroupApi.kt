@@ -18,10 +18,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody
 import org.session.libsession.messaging.MessagingModuleConfiguration
-import org.session.libsession.snode.OnionRequestAPI
-import org.session.libsession.snode.OnionResponse
-import org.session.libsession.snode.SnodeAPI
-import org.session.libsession.snode.utilities.await
+import org.session.libsession.network.model.OnionError
+import org.session.libsession.network.model.OnionResponse
 import org.session.libsignal.utilities.AccountId
 import org.session.libsignal.utilities.Base64.encodeBytes
 import org.session.libsignal.utilities.ByteArraySlice
@@ -339,7 +337,7 @@ object OpenGroupApi {
 
             val headers = request.headers.toMutableMap()
             val nonce = ByteArray(16).also { SecureRandom().nextBytes(it) }
-            val timestamp = TimeUnit.MILLISECONDS.toSeconds(SnodeAPI.nowWithOffset)
+            val timestamp = TimeUnit.MILLISECONDS.toSeconds(MessagingModuleConfiguration.shared.snodeClock.currentTimeMills())
             val bodyHash = if (request.parameters != null) {
                 val parameterBytes = JsonUtil.toJson(request.parameters).toByteArray()
                 Hash.hash64(parameterBytes)
@@ -409,14 +407,21 @@ object OpenGroupApi {
         if (!request.room.isNullOrEmpty()) {
             requestBuilder.header("Room", request.room)
         }
-        return if (request.useOnionRouting) {
-            OnionRequestAPI.sendOnionRequest(requestBuilder.build(), request.server, serverPublicKey).fail { e ->
+
+        if (request.useOnionRouting) {
+            try {
+                return MessagingModuleConfiguration.shared.serverClient.send(
+                    request = requestBuilder.build(),
+                    serverBaseUrl = request.server,
+                    x25519PublicKey = serverPublicKey
+                )
+            } catch (e: Exception) {
                 when (e) {
-                    // No need for the stack trace for HTTP errors
-                    is HTTP.HTTPRequestFailedException -> Log.e("SOGS", "Failed onion request: ${e.message}")
+                    is OnionError -> Log.e("SOGS", "Failed onion request: ${e.message}")
                     else -> Log.e("SOGS", "Failed onion request", e)
                 }
-            }.await()
+                throw e
+            }
         } else {
             throw IllegalStateException("It's currently not allowed to send non onion routed requests.")
         }

@@ -1,6 +1,7 @@
-package org.session.libsession.snode
+package org.session.libsession.network
 
 import android.os.SystemClock
+import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -8,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import org.session.libsession.snode.utilities.await
+import org.session.libsession.network.snode.SnodeDirectory
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.dependencies.ManagerScope
 import org.thoughtcrime.securesms.dependencies.OnAppStartupComponent
@@ -26,8 +27,14 @@ import javax.inject.Singleton
  */
 @Singleton
 class SnodeClock @Inject constructor(
-    @param:ManagerScope private val scope: CoroutineScope
+    @param:ManagerScope private val scope: CoroutineScope,
+    private val snodeDirectory: SnodeDirectory,
+    private val snodeClient: Lazy<SnodeClient>,
 ) : OnAppStartupComponent {
+
+    //todo ONION we have a lot of calls to MessagingModuleConfiguration.shared.snodeClock.currentTimeMills()
+    // can this be improved?
+
     private val instantState = MutableStateFlow<Instant?>(null)
     private var job: Job? = null
 
@@ -37,29 +44,30 @@ class SnodeClock @Inject constructor(
         job = scope.launch {
             while (true) {
                 try {
-                    val node = SnodeAPI.getRandomSnode().await()
+                    val node = snodeDirectory.getRandomSnode()
                     val requestStarted = SystemClock.elapsedRealtime()
 
-                    var networkTime = SnodeAPI.getNetworkTime(node).await().second
+                    var networkTime = snodeClient.get().getNetworkTime(node).second
                     val requestEnded = SystemClock.elapsedRealtime()
 
-                    // Adjust the network time to account for the time it took to make the request
-                    // so that the network time equals to the time when the request was started
+                    // Adjust network time to halfway through the request duration
                     networkTime -= (requestEnded - requestStarted) / 2
 
                     val inst = Instant(requestStarted, networkTime)
 
-                    Log.d("SnodeClock", "Network time: ${Date(inst.now())}, system time: ${Date()}")
+                    Log.d(
+                        "SnodeClock",
+                        "Network time: ${Date(inst.now())}, system time: ${Date()}"
+                    )
 
                     instantState.value = inst
                 } catch (e: Exception) {
                     Log.e("SnodeClock", "Failed to get network time. Retrying in a few seconds", e)
                 } finally {
-                    // Retry frequently if we haven't got any result before
                     val delayMills = if (instantState.value == null) {
                         3_000L
                     } else {
-                        3600_000L
+                        3_600_000L
                     }
 
                     delay(delayMills)
