@@ -24,42 +24,6 @@ Build instructions can be found in [BUILDING.md](BUILDING.md).
 
 Want to help us translate Session into your language? You can do so at https://crowdin.com/project/session-android!
 
-## Verifying signatures
-
-**Step 1:**
-
-```
-wget https://raw.githubusercontent.com/oxen-io/oxen-core/master/utils/gpg_keys/KeeJef.asc
-gpg --import KeeJef.asc
-```
-
-**Step 2:**
-
-Get the signed hash for this release. `SESSION_VERSION` needs to be updated for the release you want to verify.
-
-```
-export SESSION_VERSION=1.10.4
-wget https://github.com/oxen-io/session-android/releases/download/$SESSION_VERSION/signatures.asc
-```
-
-**Step 3:**
-
-Verify the signature of the hashes of the files.
-
-```
-gpg --verify signatures.asc 2>&1 |grep "Good signature from"
-```
-
-The command above should print "`Good signature from "Kee Jefferys...`". If it does, the hashes are valid but we still have to make the sure the signed hashes matches the downloaded files.
-
-**Step 4:**
-
-Make sure the two commands below returns the same hash. If they do, files are valid.
-
-```
-sha256sum session-$SESSION_VERSION-universal.apk
-grep universal.apk signatures.asc
-```
 
 ## License
 
